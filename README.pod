@@ -1,0 +1,164 @@
+=pod
+
+=head1 NAME
+
+Net::DNS::AutoDNS - Generates XML and communicates with AutoDNS
+
+=head1 VERSION
+
+version 0.1
+
+=head1 SYNOPSIS
+
+    use Net::DNS::AutoDNS;
+
+    my $autodns = Net::DNS::AutoDNS->new(
+        gateway  => 'http://autodns.example.org/gateway/',
+        user     => '...',
+        password => '...',
+        context  => '...',
+    );
+
+    my $xml_snippet = $rr->autodns_xml;
+
+=head1 DESCRIPTION
+
+This module adds methods to several Net::DNS::RR classes (by boldly invading
+their namespaces) and provides a simple interface to the AutoDNS gateway.
+This module doesn't quite really support UTF-8, and apparently neither does
+AutoDNS, but its documentation states that encoding="utf-8" is required.
+
+=head1 METHODS
+
+=head2 new (gateway => $gateway, user => $user, password => $password,
+context => $context)
+
+Creates a new AutoDNS object and returns it. C<$context> is part of the
+authentication information, not related to Perl's use of the word "context".
+
+=head2 request ($code, element => contents, ...)
+
+Sends a request to AutoDNS. In scalar context, returns the response XML text.
+In list context, returns the XML text and an XML document object.
+
+Request codes are documented in the AutoDNS Interface Documentation. The codes
+must be passed as strings, including leading C<0>'s.
+
+The contents are a key/value list, where the value is a string or an ARRAY
+reference with another key/value list. These can be nested.
+
+For example, this list:
+
+    '1234', root => [
+        a => "Example",
+        b => "Voorbeeld",
+        c => [
+            d => "More",
+        ],
+    ];
+
+will result in the following XML to be submitted:
+
+    <?xml...?>
+    <request>
+        <auth>...</auth>
+        <task>
+            <code>1234</code>
+            <a>Example</a>
+            <b>Voorbeeld</b>
+            <c>
+                <d>More</d>
+            </c>
+        </task>
+    </request>
+
+In the key/value list, references to strings of literal XML may be passed at
+any position. They are mixed into the request string without verification.
+
+On failure, an exception is thrown.
+
+=head2 get_zone_list
+
+Issues request 0205. Retuns a list of zone names.
+
+=head2 get_zone_xml ($name)
+
+Issues request 0205 to request a single zone. Returns the response XML document
+as a string and/or a document object, like the C<request> method.
+
+=head2 get_zone ($name)
+
+Issues request 0205 to request a single zone. Returns a Net::DNS::AutoDNS::Zone
+object.
+
+=head2 create_zone ($zone)
+
+Issues request 0201 to create a zone. Requires a Net::DNS::AutoDNS::Zone object.
+Returns what the C<request> method returns.
+
+=head2 update_zone ($zone)
+
+Issues request 0202 to update a zone. Requires a Net::DNS::AutoDNS::Zone object.
+Returns what the C<request> method returns.
+
+=head2 delete_zone ($name)
+
+Issues request 0203 to delete a zone. Requires a Net::DNS::AutoDNS::Zone object
+or the name of a zone. Returns what the C<request> method returns.
+
+=head1 Other classes
+
+=head2 Net::DNS::AutoDNS::Zone
+
+Class for objects representing zones in AutoDNS. See L<Net::DNS::AutoDNS::Zone>.
+
+=head1 Monkeypatched methods
+
+=head2 Net::DNS::RR::<type>::autodns_xml
+
+Returns a piece of XML representing the RR in AutoDNS format. To check if a
+certain RR type is supported by this module, you can use:
+
+    if ($rr->can('autodns_xml')) { print $rr->autodns_xml; }
+
+As of december 2009, the following record types are supported by AutoDNS and
+this module: A, MX, CNAME, NS, PTR, HINFO, TXT, AAAA, SRV, NAPTR.
+
+Note that AutoDNS mutilates records by removing C<"> characters, making it
+impossible to use whitespace in values.
+
+Absolute hostnames have their origin replaced by C<XXORIGINXX.> in the value.
+
+=head1 CAVEATS
+
+SSL CERTIFICATES ARE ACCEPTED WITHOUT VERIFICATION. Vulnerable to MITM attacks
+and DNS/resolver (cache) poisoning/hijacking. (The underlying SSL module may
+implement checks. See L<LWP> for a list of supported modules, and their
+respective manuals.)
+
+XML entities emitted are numeric (decimal).
+
+Validity and wellformedness are not verified.
+
+Behaviour for non-ASCII data is undefined.
+
+=head1 SEE ALSO
+
+L<Net::DNS::AutoDNS::Zone>, L<Net::DNS>
+
+L<http://www.cpanel.com/>, L<http://www.autodns.com/>
+
+AutoDNS Interface Documentation
+
+=head1 AUTHOR
+
+Juerd Waalboer <juerd@tnx.nl>
+
+=head1 COPYRIGHT AND LICENSE
+
+This software is Copyright (c) 2013 by Juerd Waalboer.
+
+This is free software, licensed under:
+
+  The (three-clause) BSD License
+
