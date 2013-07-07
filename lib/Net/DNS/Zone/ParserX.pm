@@ -1240,7 +1240,7 @@ sub _read_namedcomp {
 }
 
 sub DESTROY {
-    close($DUMP);
+    close($DUMP);          ## no critic
     return;
 }
 
