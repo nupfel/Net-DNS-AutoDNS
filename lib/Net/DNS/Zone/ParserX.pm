@@ -381,7 +381,7 @@ sub _read {
     }
 
     $self->{"IncludeRecursionDetector"}++;    # Used for testing INCLUDE LOOPS
-    my $fh_in = new IO::File;
+    my $fh_in = IO::File->new;
     $fh_in->open("< $filename")
         || return "READ FAILURE: Could not open $filename\n";
 
