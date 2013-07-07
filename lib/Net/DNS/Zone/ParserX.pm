@@ -1231,16 +1231,16 @@ sub _read_namedcomp {
         }
     }
 
-    close($DUMP);
+    close($DUMP);                        ## no critic
 
-    print $fh_out "\n";    # Make sure file ends with newline
+    print $fh_out "\n";                  # Make sure file ends with newline
 
     return ("success");
 
 }
 
 sub DESTROY {
-    close($DUMP);          ## no critic
+    close($DUMP);
     return;
 }
 
