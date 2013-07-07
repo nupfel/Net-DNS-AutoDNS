@@ -1187,14 +1187,14 @@ sub _read_namedcomp {
         return $lastresult;
     }
 
+    $origin =~ s/\.$// unless ($origin eq ".");
+
+    my $loadzone_result = "";
+    my $ProcessedApex;
+
     open($DUMP, "<", $tmpfname)
         || return ("Could not execute " . join(" ", $cmd))
         ;    # This should cause classic parsing
-    my $loadzone_result = "";
-
-    $origin =~ s/\.$// unless ($origin eq ".");
-
-    my $ProcessedApex;
 
     CONTENT: while (<$DUMP>) {
         if (/^\S+\s+\d+\s+IN\s+(SOA|RRSIG\s+\w+|DNSKEY|NSEC|SOA|NXT|SIG)\s+/o) {
@@ -1229,7 +1229,6 @@ sub _read_namedcomp {
             my $rr = Net::DNS::RR->new($_);
             push @{ $self->{"create_rr"} }, $rr;
         }
-
     }
 
     close($DUMP);
