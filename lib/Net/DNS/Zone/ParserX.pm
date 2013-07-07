@@ -1192,9 +1192,9 @@ sub _read_namedcomp {
     my $loadzone_result = "";
     my $ProcessedApex;
 
-    open($DUMP, "<", $tmpfname)
+    open($DUMP, "<", $tmpfname)    ## no critic
         || return ("Could not execute " . join(" ", $cmd))
-        ;    # This should cause classic parsing
+        ;                          # This should cause classic parsing
 
     CONTENT: while (<$DUMP>) {
         if (/^\S+\s+\d+\s+IN\s+(SOA|RRSIG\s+\w+|DNSKEY|NSEC|SOA|NXT|SIG)\s+/o) {
@@ -1231,9 +1231,9 @@ sub _read_namedcomp {
         }
     }
 
-    close($DUMP);                        ## no critic
+    close($DUMP);
 
-    print $fh_out "\n";                  # Make sure file ends with newline
+    print $fh_out "\n";    # Make sure file ends with newline
 
     return ("success");
 
