@@ -1232,8 +1232,10 @@ sub _read_namedcomp {
 
     }
 
-    print $fh_out "\n";                  # Make sure file ends with newline
     close($DUMP);
+
+    print $fh_out "\n";    # Make sure file ends with newline
+
     return ("success");
 
 }
