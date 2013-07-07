@@ -1,6 +1,7 @@
 package Net::DNS::Zone::ParserX;
 
 use strict;
+use warnings;
 use vars qw (
     $VERSION
     $REVISION
@@ -8,6 +9,7 @@ use vars qw (
     @EXPORT_OK
     $ZONE_RR_REGEX
     $NAMED_COMPILEZONE
+    $DUMP
 );
 
 use File::Basename;
@@ -17,7 +19,6 @@ use IO::File;
 use IO::Handle;
 use Net::DNS;
 use Net::DNS::RR;
-use Shell qw (which);
 
 # ABSTRACT: A Zone Pre-Parser (slightly altered fork in cpanel2autodns)
 
@@ -30,10 +31,6 @@ perldoc L<Net::DNS::Zone::Parser> for details.
 =head1 FORK
 
 Requirement for Net::DNS::SEC blocked adoption.
-
-Non-silent which(1) broke cpanel2autodns by splurting useless information
-on stderr; C<named-compilezone> is not required, and now forcefully
-disabled.
 
 =cut
 
@@ -51,7 +48,7 @@ BEGIN {
 
 # Debugging during code development ... Anything greater than 0 will
 # cause debugging output.
-use constant DEBUG => 0;
+use constant DEBUG => 0;    ## no critic
 
 my $debug = DEBUG;
 
@@ -250,6 +247,8 @@ sub build_regex {
                     \$";
 
     print STDERR "Regex: $ZONE_RR_REGEX\n" if DEBUG;
+
+    return;
 }
 
 ###################
@@ -259,8 +258,9 @@ sub build_regex {
 # returns blesssed hash or dies.
 
 sub new {
-    my ($caller, $argument) = @_;
-    my $class = ref($caller) || $caller;
+    my ($class, $argument) = @_;
+
+    $class = ref($class) || $class;
     my $self = {};
     bless($self, $class);
 
@@ -277,16 +277,15 @@ sub new {
     else {
         $self->{"fh"} = IO::File->new_tmpfile;
     }
+
     return $self;
 }
-
-#
 
 ############################
 # read method
 # See perldoc for details
 
-sub read {
+sub read {    ## no critic (ProhibitBuiltinHomonyms)
     my $self              = shift;
     my $possible_filename = shift;
     my $arghash           = shift;
@@ -1159,13 +1158,11 @@ sub _parseline {
 
 }
 
-# Use named-compilezone -D to do the processin;
+# Use named-compilezone -D to do the processing;
 
 sub _read_namedcomp {
-    my $self     = shift;
-    my $fh_out   = shift;
-    my $filename = shift;
-    my $origin   = shift;
+    my ($self, $fh_out, $filename, $origin) = @_;
+
     my $tmpfh    = File::Temp->new();
     my $tmpfname = $tmpfh->filename;
 
@@ -1190,7 +1187,7 @@ sub _read_namedcomp {
         return $lastresult;
     }
 
-    open(DUMP, $tmpfname)
+    open($DUMP, "<", $tmpfname)
         || return ("Could not execute " . join(" ", $cmd))
         ;    # This should cause classic parsing
     my $loadzone_result = "";
@@ -1199,7 +1196,7 @@ sub _read_namedcomp {
 
     my $ProcessedApex;
 
-    CONTENT: while (<DUMP>) {
+    CONTENT: while (<$DUMP>) {
         if (/^\S+\s+\d+\s+IN\s+(SOA|RRSIG\s+\w+|DNSKEY|NSEC|SOA|NXT|SIG)\s+/o) {
             my $type = $1;
             $self->{strip_dnskey} && ($type eq "DNSKEY") && next CONTENT;
@@ -1236,14 +1233,14 @@ sub _read_namedcomp {
     }
 
     print $fh_out "\n";                  # Make sure file ends with newline
-    close(DUMP);
+    close($DUMP);
     return ("success");
 
 }
 
 sub DESTROY {
-
-    close(DUMP);
+    close($DUMP);
+    return;
 }
 
 =head1 FUNCTIONS
