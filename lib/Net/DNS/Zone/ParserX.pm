@@ -97,7 +97,6 @@ parse RRs with ownernames that are below in another zone because a NS
 RR elsewhere in the zone.
 
 
-
 =head1 METHODS
 
 =head2 new
@@ -111,6 +110,32 @@ object. If not specified a temporary IO::File type object will be
 created to which the lines will be printed. This object can be
 obtained using the get_io method
 
+=cut
+
+sub new {
+    my ($class, $argument) = @_;
+
+    $class = ref($class) || $class;
+    my $self = {};
+    bless($self, $class);
+
+    if ($argument) {
+        print "new called with an argument\n" if $debug;
+        if ($argument->isa("IO::Handle")) {
+            $self->{"fh"} = $argument;
+        }
+        else {
+            die
+                'Failure: supplied argument is not an instance of IO::File, IO::Handle or related i.o.w. isa( IO::Handle) failed';
+        }
+    }
+    else {
+        $self->{"fh"} = IO::File->new_tmpfile;
+    }
+
+    return $self;
+}
+
 =head2 get_io
 
    my $io=$parser->get_io;
@@ -122,8 +147,14 @@ Returns the filehandle to which the zone file has been written. This
 is either the filehandle specified as argument to the new() method or
 one that points to a temporary file.
 
-=head2 read
+=cut
 
+sub get_io {
+    my $self = shift;
+    return $self->{"fh"};
+}
+
+=head2 read
 
     my $parser=Net::DNS::Zone::Parser->new;
     $parser->read("/tmp/example.foo");
@@ -158,8 +189,7 @@ get_io method.
 
 The HASH may contain 1 or more of the following arguments.
 
-=over 
-
+=over
 
 =item ORIGIN   
 
@@ -206,89 +236,12 @@ KEY RRs are _not_ ignored).
 if this value evaluates to TRUE the SOA serial will be increased by 1 
 when written to the filehandle.
 
-
 =back
-
-
-=head2 get_array
-
-Returns a reference to the array that is created if CREATE_RR is set
-to true during the read method.
-
-=head2 get_origin
-
-    my $origin=$parser->get_origin;
-
-Returns the origin of the zone that was parsed.
 
 =cut
 
-# This code is simalar but not equal to the Net::DNS::RR function.
-# The resulting regexp is just slightly different.
-sub build_regex {
-
-    # Longest ones go first, so the regex engine will match AAAA before A.
-    my $types =
-        join('|', sort { length $b <=> length $a } keys %Net::DNS::typesbyname);
-
-    $types .= '|TYPE\\d+';
-
-    $ZONE_RR_REGEX = " ^ 
-                                        \\s*
-                    (\\S+)+     # name anything non-space will do 
-                    \\s*                
-                    (\\d+)?           
-                    \\s*
-                    ($classes)?
-                    \\s*
-                    ($types)    # There must be a type specified.
-                    \\s*
-                    (.*)
-                    \$";
-
-    print STDERR "Regex: $ZONE_RR_REGEX\n" if DEBUG;
-
-    return;
-}
-
-###################
-#
-# new constructor method.
-# See perldoc for arguments
-# returns blesssed hash or dies.
-
-sub new {
-    my ($class, $argument) = @_;
-
-    $class = ref($class) || $class;
-    my $self = {};
-    bless($self, $class);
-
-    if ($argument) {
-        print "new called with an argument\n" if $debug;
-        if ($argument->isa("IO::Handle")) {
-            $self->{"fh"} = $argument;
-        }
-        else {
-            die
-                'Failure: supplied argument is not an instance of IO::File, IO::Handle or related i.o.w. isa( IO::Handle) failed';
-        }
-    }
-    else {
-        $self->{"fh"} = IO::File->new_tmpfile;
-    }
-
-    return $self;
-}
-
-############################
-# read method
-# See perldoc for details
-
 sub read {    ## no critic (ProhibitBuiltinHomonyms)
-    my $self              = shift;
-    my $possible_filename = shift;
-    my $arghash           = shift;
+    my ($self, $possible_filename, $arghash) = @_;
 
     my $origin = $arghash->{"ORIGIN"};
 
@@ -304,27 +257,23 @@ sub read {    ## no critic (ProhibitBuiltinHomonyms)
 
     if ($arghash->{"STRIP_DNSKEY"}) {
         $self->{strip_dnskey} = 1;
-
     }
 
     if ($arghash->{"STRIP_NSEC"}) {
         $self->{strip_nsec} = 1;
-
     }
+
     if ($arghash->{"STRIP_RRSIG"}) {
         $self->{strip_rrsig} = 1;
-
     }
 
     if ($arghash->{"STRIP_OLD"}) {
         $self->{strip_old} = 1;
-
     }
 
     $self->{bump_soa} = 0;
     if ($arghash->{"BUMP_SOA"}) {
         $self->{bump_soa} = 1;
-
     }
 
     my $fh = $self->{"fh"};
@@ -351,6 +300,66 @@ sub read {    ## no critic (ProhibitBuiltinHomonyms)
     return $returnval if $returnval =~ /^READ FAILURE:/o;
 
     return 0;
+}
+
+=head2 get_array
+
+Returns a reference to the array that is created if CREATE_RR is set
+to true during the read method.
+
+=cut
+
+sub get_array {
+    my $self = shift;
+
+    return [] unless $self->{create_rr};
+    return $self->{create_rr};
+}
+
+=head2 get_origin
+
+    my $origin=$parser->get_origin;
+
+Returns the origin of the zone that was parsed.
+
+=cut
+
+sub get_origin {
+    my $self = shift;
+    return $self->{'_origin'};
+}
+
+=head2 build_regex
+
+This code is simalar but not equal to the Net::DNS::RR function.
+The resulting regexp is just slightly different.
+
+=cut
+
+sub build_regex {
+
+    # Longest ones go first, so the regex engine will match AAAA before A.
+    my $types =
+        join('|', sort { length $b <=> length $a } keys %Net::DNS::typesbyname);
+
+    $types .= '|TYPE\\d+';
+
+    $ZONE_RR_REGEX = " ^ 
+                                        \\s*
+                    (\\S+)+     # name anything non-space will do 
+                    \\s*                
+                    (\\d+)?           
+                    \\s*
+                    ($classes)?
+                    \\s*
+                    ($types)    # There must be a type specified.
+                    \\s*
+                    (.*)
+                    \$";
+
+    print STDERR "Regex: $ZONE_RR_REGEX\n" if DEBUG;
+
+    return;
 }
 
 sub _read {
@@ -426,9 +435,10 @@ sub _read {
             )
         {
 
-            LINEPARSE: while (s/^(.)(.*)$/$2/o && $i < 200) { # no more than 200
-                                                              # lines for multi-
-                                                              # line RRs
+            LINEPARSE:
+            while (s/^(.)(.*)$/$2/o && $i < 200) {    # no more than 200
+                                                      # lines for multi-
+                                                      # line RRs
                 print "LINE: " . $_ if DEBUG > 10;
                 print "BUFF: " . $buffer . "\n\n" if DEBUG > 10;
 
@@ -440,8 +450,9 @@ sub _read {
                         next READLINE;
                     }
                     else {
-                        next READLINE if $buffer =~ s/^\s*$//o;    # buffer only
-                              # contains spaces
+                        next READLINE
+                            if $buffer =~ s/^\s*$//o;    # buffer only
+                                                         # contains spaces
                         last LINEPARSE;
                     }
                 }
@@ -517,7 +528,8 @@ sub _read {
         if (/^\s*\$TTL\s+(\d+)/o) {    #FOUND a $TTL directive
             $lastseenTTL = $1;
             $defaultTTL = $lastseenTTL if (!$defaultTTL);
-            print ";; DEFAULT TTL found : " . $lastseenTTL . "\n" if DEBUG > 1;
+            print ";; DEFAULT TTL found : " . $lastseenTTL . "\n"
+                if DEBUG > 1;
             $self->{'default_ttl'} = $defaultTTL;
             next READLINE;
         }
@@ -574,8 +586,10 @@ sub _read {
             $previousdname = $1;
 
             # below is a uggly bug fix.
-            $previousdname = $lastseenORIGIN if ($previousdname eq '$GENERATE');
-            $previousdname = $lastseenORIGIN if ($previousdname eq '$INCLUDE');
+            $previousdname = $lastseenORIGIN
+                if ($previousdname eq '$GENERATE');
+            $previousdname = $lastseenORIGIN
+                if ($previousdname eq '$INCLUDE');
         }
         else {
             $_ = $previousdname . $_;
@@ -645,7 +659,8 @@ sub _read {
                     # A and AAAA are left alone
                     $my_generated_record .= processGENERATEarg($RHS, $i, "");
                 }
-                print ";; GENERATE: " . $my_generated_record . "\n" if DEBUG;
+                print ";; GENERATE: " . $my_generated_record . "\n"
+                    if DEBUG;
 
                 print $fh_out $my_generated_record . "\n";
 
@@ -681,27 +696,6 @@ sub _read {
     return $lastseenTTL;
 }
 
-####################################
-#  Few access methods.
-#  see perldoc for details
-
-sub get_io {
-    my $self = shift;
-    return $self->{"fh"};
-}
-
-sub get_array {
-    my $self = shift;
-
-    return [] unless $self->{create_rr};
-    return $self->{create_rr};
-}
-
-sub get_origin {
-    my $self = shift;
-    return $self->{'_origin'};
-}
-
 #
 # Internal functions.
 
@@ -726,6 +720,38 @@ sub _complete_dname {
     return $dname;
 }
 
+=head1 FUNCTIONS
+
+=head2 processGENERATEarg
+
+  use Net::DNS::Zone::Parser (processGENERATEarg)
+  $generated=processGENERATEarg(0.0.${1,3},5,"inaddr.arpa."
+
+This exported function parses the "LHS" and "RHS" from a BIND generate
+directive.  The first argument contains the "LHS" or "RHS", the second
+argument the iterator vallue and the last argument contains the value
+of the "origin" that is to be added if the result of the generate is
+not a FQDN (it is the vallue that is stupidly appended if the synthesized
+name does not end with a ".").
+
+
+From the BIND documentation:
+
+lhs describes the owner name of the resource records to be
+created. Any single $ symbols within the lhs side are replaced by the
+iterator value. To get a $ in the output you need to escape the $
+using a backslash \, e.g. \$. The $ may optionally be followed by
+modifiers which change the offset from the iterator, field width and
+base. Modifiers are introduced by a { immediately following the $ as
+${offset[,width[,base]]}. e.g. ${-20,3,d} which subtracts 20 from the
+current value, prints the result as a decimal in a zero padded field
+of with 3. Available output forms are decimal (d), octal (o) and
+hexadecimal (x or X for uppercase). The default modifier is
+${0,0,d}. If the lhs is not absolute, the current $ORIGIN is appended
+to the name.
+
+=cut
+
 ####################################################
 #  processGENERATEarg
 #
@@ -747,8 +773,6 @@ sub _complete_dname {
 #hexadecimal (x or X for uppercase). The default modifier is
 #${0,0,d}. If the lhs is not absolute, the current $ORIGIN is appended
 #to the name.
-
-# See perldoc
 
 sub processGENERATEarg {
     my $lhs    = shift;
@@ -1243,38 +1267,6 @@ sub DESTROY {
     close($DUMP);
     return;
 }
-
-=head1 FUNCTIONS
-
-=head2 processGENERATEarg
-
-  use Net::DNS::Zone::Parser (processGENERATEarg)
-  $generated=processGENERATEarg(0.0.${1,3},5,"inaddr.arpa."
-
-This exported function parses the "LHS" and "RHS" from a BIND generate
-directive.  The first argument contains the "LHS" or "RHS", the second
-argument the iterator vallue and the last argument contains the value
-of the "origin" that is to be added if the result of the generate is
-not a FQDN (it is the vallue that is stupidly appended if the synthesized
-name does not end with a ".").
-
-
-From the BIND documentation:
-
-lhs describes the owner name of the resource records to be
-created. Any single $ symbols within the lhs side are replaced by the
-iterator value. To get a $ in the output you need to escape the $
-using a backslash \, e.g. \$. The $ may optionally be followed by
-modifiers which change the offset from the iterator, field width and
-base. Modifiers are introduced by a { immediately following the $ as
-${offset[,width[,base]]}. e.g. ${-20,3,d} which subtracts 20 from the
-current value, prints the result as a decimal in a zero padded field
-of with 3. Available output forms are decimal (d), octal (o) and
-hexadecimal (x or X for uppercase). The default modifier is
-${0,0,d}. If the lhs is not absolute, the current $ORIGIN is appended
-to the name.
-
-=cut
 
 =head1 Supported DIRECTIVEs
 
